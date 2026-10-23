@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>학교 스마트 분실물 센터 (AI Auto-Classification)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Korean Font (Pretendard) -->
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+            background-color: #f8fafc;
+        }
+        .drag-active {
+            border-color: #6366f1 !important;
+            background-color: #eef2ff !important;
+        }
+    </style>
+</head>
+<body class="min-h-screen text-slate-800 flex flex-col">
+
+    <!-- Top Navigation Header -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="bg-indigo-600 text-white p-2 rounded-xl shadow-md flex items-center justify-center">
+                    <i data-lucide="brain-circuit" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">학교 스마트 분실물 센터</h1>
+                    <p class="text-xs text-slate-500">실시간 AI 비전 자동 분류 및 영구 보관 시스템</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-3">
+                <button onclick="openRegisterModal()" class="inline-flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl font-medium text-sm transition shadow-md hover:shadow-indigo-100">
+                    <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                    <span>분실물 등록하기</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero / Status Banner -->
+    <section class="bg-gradient-to-br from-indigo-900 via-indigo-800 to-violet-900 text-white py-10 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+        <div class="absolute inset-0 opacity-10 bg-[radial-gradient(#e0e7ff_1px,transparent_1px)] [background-size:16px_16px]"></div>
+        <div class="max-w-7xl mx-auto relative z-10 grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+            <div class="md:col-span-2 space-y-3">
+                <div class="inline-flex items-center space-x-2 bg-indigo-500/30 border border-indigo-400/30 px-3 py-1 rounded-full text-xs font-semibold text-indigo-200 backdrop-blur-md">
+                    <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                    <span>Gemini AI 비전 연동</span>
+                </div>
+                <h2 class="text-2xl sm:text-3xl font-extrabold tracking-tight">사진만 등록하면 AI가 자동으로 인식합니다</h2>
+                <p class="text-indigo-200 text-xs sm:text-sm max-w-xl leading-relaxed">
+                    실제 분실물 사진을 올리면 AI가 물건 이름, 카테고리, 특징, 색상을 자동으로 분석합니다. 등록된 물건은 브라우저에 영구 보관됩니다.
+                </p>
+            </div>
+            <div class="bg-white/10 backdrop-blur-md border border-white/20 p-5 rounded-2xl shadow-xl space-y-3">
+                <div class="flex items-center justify-between border-b border-white/10 pb-2">
+                    <span class="text-xs font-semibold text-indigo-100">현재 보관 현황</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-500/20 text-emerald-300">실시간 연동</span>
+                </div>
+                <div class="grid grid-cols-2 gap-3 text-center">
+                    <div class="bg-white/5 p-2.5 rounded-xl border border-white/5">
+                        <p class="text-xl font-bold text-white" id="stat-active">0</p>
+                        <p class="text-[11px] text-indigo-200">보관 중</p>
+                    </div>
+                    <div class="bg-white/5 p-2.5 rounded-xl border border-white/5">
+                        <p class="text-xl font-bold text-emerald-300" id="stat-claimed">0</p>
+                        <p class="text-[11px] text-indigo-200">주인 찾음 완료</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+
+        <!-- Search and Filter Bar -->
+        <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+            <div class="flex flex-col md:flex-row gap-4 items-center justify-between">
+                <!-- Search Input -->
+                <div class="relative w-full md:w-96">
+                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                        <i data-lucide="search" class="w-4 h-4"></i>
+                    </span>
+                    <input type="text" id="search-input" oninput="handleSearch()" placeholder="물건 명칭, 장소, 상세 설명 검색..." class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition">
+                </div>
+                <!-- Status Filter Toggle -->
+                <div class="flex items-center space-x-2 w-full md:w-auto justify-end">
+                    <span class="text-xs font-semibold text-slate-500">상태:</span>
+                    <select id="status-filter" onchange="handleStatusFilter()" class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-700">
+                        <option value="all">전체 상태</option>
+                        <option value="active">보관 중</option>
+                        <option value="claimed">주인 찾음 완료</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Category Filter Tabs -->
+            <div class="flex items-center space-x-2 overflow-x-auto pb-1 scrollbar-none" id="category-tabs">
+                <button onclick="setCategory('전체')" class="category-btn active px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition whitespace-nowrap bg-indigo-600 text-white shadow-sm" data-cat="전체">전체</button>
+                <button onclick="setCategory('전자기기')" class="category-btn px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition whitespace-nowrap bg-slate-100 text-slate-600 hover:bg-slate-200" data-cat="전자기기">📱 전자기기</button>
+                <button onclick="setCategory('학용품')" class="category-btn px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition whitespace-nowrap bg-slate-100 text-slate-600 hover:bg-slate-200" data-cat="학용품">✏️ 학용품</button>
+                <button onclick="setCategory('의류')" class="category-btn px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition whitespace-nowrap bg-slate-100 text-slate-600 hover:bg-slate-200" data-cat="의류">🧥 의류</button>
+                <button onclick="setCategory('소지품/가방')" class="category-btn px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition whitespace-nowrap bg-slate-100 text-slate-600 hover:bg-slate-200" data-cat="소지품/가방">🎒 소지품/가방</button>
+                <button onclick="setCategory('기타')" class="category-btn px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition whitespace-nowrap bg-slate-100 text-slate-600 hover:bg-slate-200" data-cat="기타">📦 기타</button>
+            </div>
+        </div>
+
+        <!-- Items Grid -->
+        <div id="items-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <!-- Dynamically populated -->
+        </div>
+
+        <!-- Empty State (Shown when 0 items) -->
+        <div id="empty-state" class="flex flex-col items-center justify-center py-20 text-center bg-white rounded-3xl border border-slate-200 p-8 space-y-4">
+            <div class="w-20 h-20 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-500 shadow-inner">
+                <i data-lucide="package-open" class="w-10 h-10"></i>
+            </div>
+            <div class="space-y-1">
+                <h3 class="text-lg font-bold text-slate-800">등록된 분실물이 없습니다</h3>
+                <p class="text-sm text-slate-500 max-w-sm">습득한 물건의 사진을 올려 AI 자동 분석으로 손쉽게 분실물을 등록해보세요!</p>
+            </div>
+            <button onclick="openRegisterModal()" class="inline-flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-medium text-sm transition shadow-md">
+                <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                <span>첫 분실물 등록하기</span>
+            </button>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 py-6 mt-12 text-center text-xs text-slate-500">
+        <p>학교 스마트 분실물 센터 &copy; 2026 AI Lost & Found System. All rights reserved.</p>
+    </footer>
+
+    <!-- Register Modal -->
+    <div id="register-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl space-y-6 my-8 relative">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+                <div class="flex items-center space-x-2">
+                    <div class="bg-indigo-100 text-indigo-600 p-2 rounded-xl">
+                        <i data-lucide="camera" class="w-5 h-5"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-800">분실물 AI 자동 등록</h3>
+                </div>
+                <button onclick="closeRegisterModal()" class="text-slate-400 hover:text-slate-600 p-2 rounded-xl hover:bg-slate-100 transition">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <!-- Form Content -->
+            <form id="register-form" onsubmit="handleFormSubmit(event)" class="space-y-5">
+                
+                <!-- Drag and Drop Image Upload Box -->
+                <div class="space-y-2">
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">분실물 사진 업로드 (필수)</label>
+                    <div id="drop-zone" 
+                         onclick="document.getElementById('file-input').click()"
+                         ondragover="handleDragOver(event)"
+                         ondragleave="handleDragLeave(event)"
+                         ondrop="handleDrop(event)"
+                         class="border-2 border-dashed border-slate-200 rounded-2xl p-6 text-center hover:border-indigo-400 transition cursor-pointer relative bg-slate-50">
+                        
+                        <input type="file" id="file-input" accept="image/*" class="hidden" onchange="handleFileSelect(event)">
+                        
+                        <div id="upload-placeholder" class="flex flex-col items-center space-y-2">
+                            <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm text-indigo-500">
+                                <i data-lucide="upload-cloud" class="w-6 h-6"></i>
+                            </div>
+                            <p class="text-xs text-slate-700 font-medium">사진을 드래그하여 놓거나 클릭하여 업로드</p>
+                            <p class="text-[10px] text-slate-400">JPG, PNG, WEBP 지원 (자동 AI 분석)</p>
+                        </div>
+
+                        <!-- Image Preview -->
+                        <div id="image-preview-box" class="hidden relative">
+                            <img id="preview-img" class="max-h-52 mx-auto rounded-xl object-contain shadow-sm border border-slate-200">
+                            <button type="button" onclick="resetImage(event)" class="absolute top-2 right-2 bg-slate-900/70 hover:bg-slate-900 text-white p-1.5 rounded-full backdrop-blur-md transition">
+                                <i data-lucide="x" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI Analysis Status Card -->
+                <div id="ai-status-card" class="hidden bg-indigo-50 border border-indigo-100 p-4 rounded-2xl space-y-2">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-2 text-indigo-700">
+                            <i data-lucide="sparkles" class="w-4 h-4 animate-spin" id="ai-spinner"></i>
+                            <span class="text-xs font-bold" id="ai-status-title">Gemini AI 비전 분석 중...</span>
+                        </div>
+                        <span id="ai-status-badge" class="bg-indigo-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">AI 분석 완료</span>
+                    </div>
+                    <p class="text-xs text-slate-600" id="ai-status-desc">업로드한 이미지에서 물건의 종류와 특징을 추출하고 있습니다.</p>
+                </div>
+
+                <!-- Form Fields -->
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">물건 명칭</label>
+                        <input type="text" id="item-title" required placeholder="AI 분석을 통해 자동 입력되거나 직접 입력하세요" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">카테고리</label>
+                            <select id="item-category" required class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <option value="전자기기">📱 전자기기</option>
+                                <option value="학용품">✏️ 학용품</option>
+                                <option value="의류">🧥 의류</option>
+                                <option value="소지품/가방">🎒 소지품/가방</option>
+                                <option value="기타">📦 기타</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">주요 색상</label>
+                            <input type="text" id="item-color" placeholder="예: 블랙, 네이비" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">습득 장소</label>
+                            <select id="item-location" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <option value="본관 1층 로비/교무실">본관 1층 로비/교무실</option>
+                                <option value="2층 복도">2층 복도</option>
+                                <option value="급식실">급식실</option>
+                                <option value="체육관 / 운동장">체육관 / 운동장</option>
+                                <option value="도서관">도서관</option>
+                                <option value="교실 복도">교실 복도</option>
+                                <option value="기타/야외">기타/야외</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">습득 날짜</label>
+                            <input type="date" id="item-date" required class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">상세 특징 / 설명</label>
+                        <textarea id="item-desc" rows="3" placeholder="AI 분석 결과 또는 추가적인 인상 착의, 브랜드 등을 적어주세요." class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">보관 위치</label>
+                            <input type="text" id="item-storage" placeholder="예: 학생안전부 분실물 상자" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">습득자 / 등록자</label>
+                            <input type="text" id="item-finder" placeholder="예: 학생안전부 / 교사" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="flex items-center justify-end space-x-3 pt-4 border-t border-slate-100">
+                    <button type="button" onclick="closeRegisterModal()" class="px-5 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition">취소</button>
+                    <button type="submit" class="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-sm font-semibold text-white shadow-md transition">등록 완료</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Detail Modal -->
+    <div id="detail-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl space-y-6 relative">
+            <button onclick="closeDetailModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-2 rounded-xl hover:bg-slate-100 transition z-10">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+            <div id="detail-content" class="space-y-6">
+                <!-- Dynamically populated detail view -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Toast Notification -->
+    <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-32 opacity-0 transition-all duration-300 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-xl flex items-center space-x-3 text-sm">
+        <i data-lucide="check-circle-2" class="w-5 h-5 text-emerald-400"></i>
+        <span id="toast-message">알림 메시지</span>
+    </div>
+
+    <!-- Application JavaScript -->
+    <script>
+        // Storage Key
+        const STORAGE_KEY = 'school_lost_and_found_items_v2';
+
+        // State Variables
+        let items = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+        let currentCategory = '전체';
+        let currentStatusFilter = 'all';
+        let currentSearchQuery = '';
+        let uploadedBase64Image = '';
+
+        // App Initialization
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            renderItems();
+            updateStats();
+            document.getElementById('item-date').valueAsDate = new Date();
+        });
+
+        // Save State to LocalStorage
+        function saveToStorage() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+        }
+
+        // Render Item Grid
+        function renderItems() {
+            const grid = document.getElementById('items-grid');
+            const emptyState = document.getElementById('empty-state');
+            
+            const filtered = items.filter(item => {
+                const matchCategory = currentCategory === '전체' || item.category === currentCategory;
+                const matchStatus = currentStatusFilter === 'all' || item.status === currentStatusFilter;
+                const matchSearch = item.title.toLowerCase().includes(currentSearchQuery.toLowerCase()) ||
+                                    item.location.toLowerCase().includes(currentSearchQuery.toLowerCase()) ||
+                                    item.desc.toLowerCase().includes(currentSearchQuery.toLowerCase());
+                return matchCategory && matchStatus && matchSearch;
+            });
+
+            if (filtered.length === 0) {
+                grid.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            grid.innerHTML = filtered.map(item => `
+                <div onclick="openDetailModal(${item.id})" class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-lg hover:-translate-y-1 transition duration-200 cursor-pointer flex flex-col group">
+                    <div class="relative h-48 bg-slate-100 overflow-hidden">
+                        <img src="${item.image}" alt="${item.title}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
+                        <div class="absolute top-3 left-3">
+                            <span class="px-2.5 py-1 rounded-full text-xs font-bold backdrop-blur-md ${item.status === 'active' ? 'bg-indigo-600/90 text-white' : 'bg-emerald-600/90 text-white'} shadow-md">
+                                ${item.status === 'active' ? '보관 중' : '주인 찾음 완료'}
+                            </span>
+                        </div>
+                        <div class="absolute bottom-3 right-3">
+                            <span class="bg-slate-900/70 text-white text-[10px] font-medium px-2 py-1 rounded-lg backdrop-blur-md flex items-center space-x-1">
+                                <i data-lucide="sparkles" class="w-3 h-3 text-indigo-400"></i>
+                                <span>${item.color || 'AI 분석'}</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="p-5 flex flex-col flex-grow justify-between space-y-4">
+                        <div class="space-y-2">
+                            <div class="flex items-center justify-between text-xs">
+                                <span class="font-semibold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-lg">${item.category}</span>
+                                <span class="text-slate-400">${item.date}</span>
+                            </div>
+                            <h3 class="font-bold text-slate-800 text-base line-clamp-1 group-hover:text-indigo-600 transition">${item.title}</h3>
+                            <p class="text-xs text-slate-500 line-clamp-2">${item.desc}</p>
+                        </div>
+                        <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                            <div class="flex items-center space-x-1.5">
+                                <i data-lucide="map-pin" class="w-3.5 h-3.5 text-slate-400"></i>
+                                <span class="font-medium text-slate-700">${item.location}</span>
+                            </div>
+                            <span class="text-indigo-600 font-semibold flex items-center space-x-1">
+                                <span>상세보기</span>
+                                <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            lucide.createIcons();
+        }
+
+        // Filter and Search Handlers
+        function setCategory(cat) {
+            currentCategory = cat;
+            document.querySelectorAll('.category-btn').forEach(btn => {
+                if(btn.dataset.cat === cat) {
+                    btn.className = 'category-btn active px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition whitespace-nowrap bg-indigo-600 text-white shadow-sm';
+                } else {
+                    btn.className = 'category-btn px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition whitespace-nowrap bg-slate-100 text-slate-600 hover:bg-slate-200';
+                }
+            });
+            renderItems();
+        }
+
+        function handleSearch() {
+            currentSearchQuery = document.getElementById('search-input').value;
+            renderItems();
+        }
+
+        function handleStatusFilter() {
+            currentStatusFilter = document.getElementById('status-filter').value;
+            renderItems();
+        }
+
+        function updateStats() {
+            const activeCount = items.filter(i => i.status === 'active').length;
+            const claimedCount = items.filter(i => i.status === 'claimed').length;
+            document.getElementById('stat-active').innerText = activeCount;
+            document.getElementById('stat-claimed').innerText = claimedCount;
+        }
+
+        // Image Handling (Drag & Drop + File Reader)
+        function handleDragOver(e) {
+            e.preventDefault();
+            document.getElementById('drop-zone').classList.add('drag-active');
+        }
+
+        function handleDragLeave(e) {
+            e.preventDefault();
+            document.getElementById('drop-zone').classList.remove('drag-active');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            document.getElementById('drop-zone').classList.remove('drag-active');
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                processImageFile(e.dataTransfer.files[0]);
+            }
+        }
+
+        function handleFileSelect(e) {
+            if (e.target.files && e.target.files[0]) {
+                processImageFile(e.target.files[0]);
+            }
+        }
+
+        function processImageFile(file) {
+            if (!file.type.startsWith('image/')) {
+                showToast("이미지 파일만 업로드할 수 있습니다.");
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                uploadedBase64Image = e.target.result;
+                document.getElementById('preview-img').src = uploadedBase64Image;
+                document.getElementById('upload-placeholder').classList.add('hidden');
+                document.getElementById('image-preview-box').classList.remove('hidden');
+
+                // Trigger Real Gemini API Analysis
+                analyzeImageWithGemini(uploadedBase64Image);
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function resetImage(e) {
+            e.stopPropagation();
+            uploadedBase64Image = '';
+            document.getElementById('file-input').value = '';
+            document.getElementById('upload-placeholder').classList.remove('hidden');
+            document.getElementById('image-preview-box').classList.add('hidden');
+            document.getElementById('ai-status-card').classList.add('hidden');
+        }
+
+        // REAL GEMINI API CALL FOR IMAGE ANALYSIS
+        async function analyzeImageWithGemini(base64Data) {
+            const statusCard = document.getElementById('ai-status-card');
+            const statusTitle = document.getElementById('ai-status-title');
+            const statusDesc = document.getElementById('ai-status-desc');
+            const statusBadge = document.getElementById('ai-status-badge');
+            const spinner = document.getElementById('ai-spinner');
+
+            statusCard.classList.remove('hidden');
+            statusTitle.innerText = "Gemini AI가 이미지를 분석하는 중입니다...";
+            statusDesc.innerText = "물건의 종류, 카테고리, 특징, 색상을 판별하고 있습니다.";
+            statusBadge.className = "bg-indigo-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse";
+            statusBadge.innerText = "분석 중";
+            spinner.classList.add('animate-spin');
+
+            try {
+                // Strip Base64 Prefix
+                const base64Clean = base64Data.split(',')[1];
+                const mimeType = base64Data.split(';')[0].split(':')[1] || 'image/jpeg';
+
+                const promptText = `Analyze this image of a lost item in a school context. 
+Provide a JSON response with the following exact fields:
+{
+  "title": "A short, precise Korean name of the item (e.g. '애플 에어팟 프로 충전 케이스', '파란색 카카오프렌즈 필통')",
+  "category": "Must be one of exactly: '전자기기', '학용품', '의류', '소지품/가방', '기타'",
+  "color": "Primary color(s) in Korean (e.g. '블랙', '화이트/실버')",
+  "description": "2-3 sentences in polite Korean describing the key visual features, condition, brand, or text on the item."
+}`;
+
+                const apiKey = ""; // Canvas runtime automatically supplies key if empty
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+                const payload = {
+                    contents: [{
+                        role: "user",
+                        parts: [
+                            { text: promptText },
+                            { inlineData: { mimeType: mimeType, data: base64Clean } }
+                        ]
+                    }],
+                    generationConfig: {
+                        responseMimeType: "application/json"
+                    }
+                };
+
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API Error: ${response.status}`);
+                }
+
+                const result = await response.json();
+                const jsonText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                if (jsonText) {
+                    const parsed = JSON.parse(jsonText);
+
+                    // Auto Fill Form Fields
+                    if (parsed.title) document.getElementById('item-title').value = parsed.title;
+                    if (parsed.category) document.getElementById('item-category').value = parsed.category;
+                    if (parsed.color) document.getElementById('item-color').value = parsed.color;
+                    if (parsed.description) document.getElementById('item-desc').value = parsed.description;
+
+                    // Update UI Status
+                    statusTitle.innerText = "AI 분석이 완료되었습니다!";
+                    statusDesc.innerText = `분석 결과: [${parsed.category}] ${parsed.title}`;
+                    statusBadge.className = "bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full";
+                    statusBadge.innerText = "완료";
+                    spinner.classList.remove('animate-spin');
+                    showToast("AI가 물건 정보를 자동으로 채웠습니다!");
+                }
+            } catch (err) {
+                console.error("Gemini API Error:", err);
+                statusTitle.innerText = "AI 분석 실패 (기본 입력 사용)";
+                statusDesc.innerText = "이미지 분석 중 오류가 발생했습니다. 직접 수동으로 정보를 입력해주세요.";
+                statusBadge.className = "bg-amber-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full";
+                statusBadge.innerText = "수동 입력";
+                spinner.classList.remove('animate-spin');
+            }
+        }
+
+        // Form Submit Handler
+        function handleFormSubmit(e) {
+            e.preventDefault();
+
+            if (!uploadedBase64Image) {
+                showToast("분실물 사진을 반드시 업로드해 주세요!");
+                return;
+            }
+
+            const newItem = {
+                id: Date.now(),
+                title: document.getElementById('item-title').value,
+                category: document.getElementById('item-category').value,
+                color: document.getElementById('item-color').value || '기타',
+                location: document.getElementById('item-location').value,
+                date: document.getElementById('item-date').value,
+                desc: document.getElementById('item-desc').value || '상세 설명 없음',
+                storage: document.getElementById('item-storage').value || '교무실 분실물 상자',
+                finder: document.getElementById('item-finder').value || '학생안전부',
+                status: 'active',
+                image: uploadedBase64Image
+            };
+
+            items.unshift(newItem);
+            saveToStorage();
+            renderItems();
+            updateStats();
+            closeRegisterModal();
+            showToast("분실물이 성공적으로 등록되었습니다!");
+        }
+
+        // Modal Controls
+        function openRegisterModal() {
+            document.getElementById('register-modal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeRegisterModal() {
+            document.getElementById('register-modal').classList.add('hidden');
+            document.body.style.overflow = 'auto';
+            document.getElementById('register-form').reset();
+            resetImage(new Event('click'));
+        }
+
+        // Item Detail View Modal
+        function openDetailModal(id) {
+            const item = items.find(i => i.id === id);
+            if (!item) return;
+
+            const modalContent = document.getElementById('detail-content');
+            modalContent.innerHTML = `
+                <div class="space-y-4">
+                    <div class="relative h-64 bg-slate-100 rounded-2xl overflow-hidden shadow-inner">
+                        <img src="${item.image}" class="w-full h-full object-cover">
+                        <div class="absolute top-4 left-4">
+                            <span class="px-3 py-1 rounded-full text-xs font-bold ${item.status === 'active' ? 'bg-indigo-600 text-white' : 'bg-emerald-600 text-white'} shadow-md">
+                                ${item.status === 'active' ? '보관 중' : '주인 찾음 완료'}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-lg">${item.category}</span>
+                            <span class="text-xs text-slate-400">등록일: ${item.date}</span>
+                        </div>
+                        <h2 class="text-xl font-bold text-slate-800">${item.title}</h2>
+                        <p class="text-sm text-slate-600 leading-relaxed">${item.desc}</p>
+                    </div>
+
+                    <!-- AI Tag Specs -->
+                    <div class="bg-indigo-50/60 border border-indigo-100 p-3.5 rounded-2xl flex items-center justify-between text-xs">
+                        <span class="text-indigo-700 font-bold flex items-center space-x-1.5">
+                            <i data-lucide="sparkles" class="w-4 h-4"></i>
+                            <span>주요 식별 색상</span>
+                        </span>
+                        <span class="font-bold text-slate-700 bg-white px-3 py-1 rounded-xl border border-indigo-100 shadow-sm">${item.color || '일반'}</span>
+                    </div>
+
+                    <!-- Location & Storage Info -->
+                    <div class="bg-slate-50 p-4 rounded-2xl space-y-3 text-sm border border-slate-200">
+                        <div class="flex items-center justify-between">
+                            <span class="text-slate-500 flex items-center space-x-2 text-xs">
+                                <i data-lucide="map-pin" class="w-4 h-4 text-indigo-500"></i>
+                                <span>습득 장소</span>
+                            </span>
+                            <span class="font-bold text-slate-800 text-xs">${item.location}</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-slate-500 flex items-center space-x-2 text-xs">
+                                <i data-lucide="user" class="w-4 h-4 text-indigo-500"></i>
+                                <span>담당자 / 습득자</span>
+                            </span>
+                            <span class="font-bold text-slate-800 text-xs">${item.finder}</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-slate-500 flex items-center space-x-2 text-xs">
+                                <i data-lucide="box" class="w-4 h-4 text-indigo-500"></i>
+                                <span>현재 보관 위치</span>
+                            </span>
+                            <span class="font-bold text-indigo-600 text-xs">${item.storage}</span>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="flex items-center space-x-3 pt-2">
+                        <button onclick="toggleStatus(${item.id})" class="flex-1 py-3 rounded-xl font-semibold text-sm text-white shadow-md transition ${item.status === 'active' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-slate-600 hover:bg-slate-700'}">
+                            ${item.status === 'active' ? '✓ 주인 찾음 완료 처리' : '↺ 보관 중으로 변경'}
+                        </button>
+                        <button onclick="deleteItem(${item.id})" class="px-4 py-3 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-sm font-semibold transition">
+                            삭제
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('detail-modal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+            lucide.createIcons();
+        }
+
+        function closeDetailModal() {
+            document.getElementById('detail-modal').classList.add('hidden');
+            document.body.style.overflow = 'auto';
+        }
+
+        function toggleStatus(id) {
+            const item = items.find(i => i.id === id);
+            if (item) {
+                item.status = item.status === 'active' ? 'claimed' : 'active';
+                saveToStorage();
+                renderItems();
+                updateStats();
+                closeDetailModal();
+                showToast(item.status === 'claimed' ? "주인 찾음 완료 처리되었습니다." : "보관 중 상태로 변경되었습니다.");
+            }
+        }
+
+        function deleteItem(id) {
+            items = items.filter(i => i.id !== id);
+            saveToStorage();
+            renderItems();
+            updateStats();
+            closeDetailModal();
+            showToast("분실물 기록이 완전히 삭제되었습니다.");
+        }
+
+        // Toast Message Notification
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-message').innerText = message;
+            toast.classList.remove('translate-y-32', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-32', 'opacity-0');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
